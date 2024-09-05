@@ -23,6 +23,7 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
+import java.util.Objects;
 import java.util.stream.Collector;
 import java.util.stream.Collectors;
 
@@ -162,6 +163,11 @@ public class RedisSinkTask extends SinkTask {
                 hset.setKeyFunction(this::key);
                 hset.setMapFunction(this::map);
                 return hset;
+            case HSETDEL:
+                HsetDel<byte[], byte[], SinkRecord> hsetDel = new HsetDel<>();
+                hsetDel.setKeyFunction(this::key);
+                hsetDel.setMapFunction(this::nullableMap);
+                return hsetDel;
             case JSONSET:
                 JsonSet<byte[], byte[], SinkRecord> jsonSet = new JsonSet<>();
                 jsonSet.setKeyFunction(this::key);
@@ -286,6 +292,33 @@ public class RedisSinkTask extends SinkTask {
 
     private byte[] collectionKey(SinkRecord sinkRecord) {
         return keyspace(sinkRecord).getBytes(config.getCharset());
+    }
+
+    @SuppressWarnings("unchecked")
+    private Map<byte[], byte[]> nullableMap(SinkRecord sinkRecord) {
+        Object value = sinkRecord.value();
+        if (value instanceof Struct) {
+            Map<byte[], byte[]> body = new LinkedHashMap<>();
+            Struct struct = (Struct) value;
+            for (Field field : struct.schema().fields()) {
+                Object fieldValue = struct.get(field);
+                body.put(field.name().getBytes(config.getCharset()),
+                        fieldValue == null ? null : fieldValue.toString().getBytes(config.getCharset()));
+            }
+            return body;
+        }
+        if (value instanceof Map) {
+            Map<String, Object> map = (Map<String, Object>) value;
+            Map<byte[], byte[]> body = new LinkedHashMap<>();
+            for (Map.Entry<String, Object> e : map.entrySet()) {
+                body.put(e.getKey().getBytes(config.getCharset()), String.valueOf(e.getValue()).getBytes(config.getCharset()));
+            }
+            return body;
+        }
+        if (Objects.isNull(value)) {
+            return null;
+        }
+        throw new ConnectException("Unsupported source value type: " + sinkRecord.valueSchema().type().name());
     }
 
     @SuppressWarnings("unchecked")
