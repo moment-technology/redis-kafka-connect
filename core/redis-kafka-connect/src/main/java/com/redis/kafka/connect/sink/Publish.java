@@ -4,7 +4,6 @@ import java.util.function.Function;
 
 import io.lettuce.core.RedisFuture;
 import io.lettuce.core.api.async.BaseRedisAsyncCommands;
-
 import com.redis.spring.batch.writer.operation.AbstractKeyWriteOperation;
 
 public class Publish<K, V, T> extends AbstractKeyWriteOperation<K, V, T> {
