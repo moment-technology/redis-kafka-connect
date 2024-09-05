@@ -10,7 +10,7 @@ public abstract class RedisConfigDef extends ConfigDef {
 
     public static final String CLUSTER_CONFIG = "redis.cluster";
 
-    private static final boolean CLUSTER_DEFAULT = false;
+    private static final boolean CLUSTER_DEFAULT = true;
 
     private static final String CLUSTER_DOC = "Connect to a Redis Cluster database";
 
