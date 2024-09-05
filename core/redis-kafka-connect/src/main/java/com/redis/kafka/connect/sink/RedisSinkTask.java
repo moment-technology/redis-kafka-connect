@@ -166,7 +166,7 @@ public class RedisSinkTask extends SinkTask {
             case HSETDEL:
                 HsetDel<byte[], byte[], SinkRecord> hsetDel = new HsetDel<>();
                 hsetDel.setKeyFunction(this::key);
-                hsetDel.setMapFunction(this::map);
+                hsetDel.setMapFunction(this::nullableMap);
                 return hsetDel;
             case JSONSET:
                 JsonSet<byte[], byte[], SinkRecord> jsonSet = new JsonSet<>();
@@ -295,7 +295,7 @@ public class RedisSinkTask extends SinkTask {
     }
 
     @SuppressWarnings("unchecked")
-    private Map<byte[], byte[]> map(SinkRecord sinkRecord) {
+    private Map<byte[], byte[]> nullableMap(SinkRecord sinkRecord) {
         Object value = sinkRecord.value();
         if (value instanceof Struct) {
             Map<byte[], byte[]> body = new LinkedHashMap<>();
@@ -317,6 +317,30 @@ public class RedisSinkTask extends SinkTask {
         }
         if (Objects.isNull(value)) {
             return null;
+        }
+        throw new ConnectException("Unsupported source value type: " + sinkRecord.valueSchema().type().name());
+    }
+
+    @SuppressWarnings("unchecked")
+    private Map<byte[], byte[]> map(SinkRecord sinkRecord) {
+        Object value = sinkRecord.value();
+        if (value instanceof Struct) {
+            Map<byte[], byte[]> body = new LinkedHashMap<>();
+            Struct struct = (Struct) value;
+            for (Field field : struct.schema().fields()) {
+                Object fieldValue = struct.get(field);
+                body.put(field.name().getBytes(config.getCharset()),
+                        fieldValue == null ? null : fieldValue.toString().getBytes(config.getCharset()));
+            }
+            return body;
+        }
+        if (value instanceof Map) {
+            Map<String, Object> map = (Map<String, Object>) value;
+            Map<byte[], byte[]> body = new LinkedHashMap<>();
+            for (Map.Entry<String, Object> e : map.entrySet()) {
+                body.put(e.getKey().getBytes(config.getCharset()), String.valueOf(e.getValue()).getBytes(config.getCharset()));
+            }
+            return body;
         }
         throw new ConnectException("Unsupported source value type: " + sinkRecord.valueSchema().type().name());
     }
